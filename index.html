@@ -10,11 +10,11 @@
     <script type="application/javascript" src="scripts/filters.js"></script>
     <script type="application/javascript">
         let glapp;
+        let cam_stream;
         function init() {
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                 alert("Error: getUserMedia() not supported. Please try another browser.");
             }
-
 
             let i;
             let filters = document.getElementsByClassName("filter_button");
@@ -22,6 +22,14 @@
                 filters[i].addEventListener("click", selectFilter, false);
             }
 
+            cam_stream = null;
+            startVideoStream();
+
+            let webcam = document.getElementById("webcam");
+            glapp = new GlApp("view", 800, 450, webcam);
+        }
+
+        function startVideoStream() {
             let options = {
                 audio: false,
                 video: {
@@ -33,18 +41,20 @@
                     }
                 }
             };
-            navigator.mediaDevices.getUserMedia(options).then(startVideoStream);
-
-            let webcam = document.getElementById("webcam");
-            glapp = new GlApp("view", 800, 450, webcam);
+            navigator.mediaDevices.getUserMedia(options).then(receiveVideoStream);
         }
 
-        function startVideoStream(stream) {
+        function receiveVideoStream(stream) {
+            cam_stream = stream;
             let webcam = document.getElementById("webcam");
             webcam.srcObject = stream;
             webcam.onloadedmetadata = (e) => {
                 webcam.play();
                 glapp.has_video = true;
+                let start_stop = document.getElementById("start_stop");
+                let start_stop_button = document.getElementById("start_stop_button");
+                start_stop.textContent = "Stop";
+                start_stop_button.style.backgroundColor = "#D85A58";
             };
         }
 
@@ -59,6 +69,24 @@
                 else {
                     filters[i].setAttribute("selected", "false");
                 }
+            }
+        }
+
+        function startStop() {
+            let start_stop = document.getElementById("start_stop");
+            let start_stop_button = document.getElementById("start_stop_button");
+            if (start_stop.textContent === "Start") {
+                startVideoStream();
+                start_stop.textContent = "...";
+                start_stop_button.style.backgroundColor = "#C6C6C6";
+            }
+            else if (start_stop.textContent === "Stop") {
+                cam_stream.getTracks().forEach(function(track) {
+                    track.stop();
+                });
+                glapp.has_video = false;
+                start_stop.textContent = "Start";
+                start_stop_button.style.backgroundColor = "#48C45B";
             }
         }
     </script>
@@ -80,14 +108,20 @@
                 <div id="fish_eye_button" class="filter_button">
                     <p id="fish_eye">Fish Eye</p>
                 </div>
-                <div id="shockwave_button" class="filter_button">
-                    <p id="shockwave">Shockwave</p>
+                <div id="ripple_button" class="filter_button">
+                    <p id="ripple">Ripple</p>
                 </div>
                 <div id="toon_button" class="filter_button">
                     <p id="toon">Toonify</p>
                 </div>
                 <div id="edge_button" class="filter_button">
                     <p id="edge">Edge Detection</p>
+                </div>
+            </div>
+            <div class="spacer"></div>
+            <div>
+                <div id="start_stop_button">
+                    <p id="start_stop" onclick="startStop()">...</p>
                 </div>
             </div>
         </div>

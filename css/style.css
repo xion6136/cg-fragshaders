@@ -58,6 +58,21 @@ input {
     display: none;
 }
 
+#start_stop_button {
+    display: inline-block;
+    background-color: #C6C6C6;
+    width: 10rem;
+    height: 3rem;
+    margin: 0.5rem;
+    cursor: pointer;
+}
+
+#start_stop_button p {
+    height: 3rem;
+    line-height: 3rem;
+    color: #000000;
+}
+
 .filter_button {
     display: inline-block;
     background-color: #6A6A6A;

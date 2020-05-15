@@ -14,7 +14,7 @@ class GlApp {
             normal: null,                                 // (vertex shader + fragment shader) and its
             black_white: null,                            // corresponding uniform variables
             fish_eye: null,
-            shockwave: null,
+            ripple: null,
             toon: null,
             edge: null
         };
@@ -45,15 +45,15 @@ class GlApp {
         let black_white_fs = this.GetFile('shaders/black_white.frag');
         let fish_eye_vs = this.GetFile('shaders/fish_eye.vert');
         let fish_eye_fs = this.GetFile('shaders/fish_eye.frag');
-        let shockwave_vs = this.GetFile('shaders/shockwave.vert');
-        let shockwave_fs = this.GetFile('shaders/shockwave.frag');
+        let ripple_vs = this.GetFile('shaders/ripple.vert');
+        let ripple_fs = this.GetFile('shaders/ripple.frag');
         let toon_vs = this.GetFile('shaders/toon.vert');
         let toon_fs = this.GetFile('shaders/toon.frag');
         let edge_vs = this.GetFile('shaders/edge.vert');
         let edge_fs = this.GetFile('shaders/edge.frag');
 
         Promise.all([normal_vs, normal_fs, black_white_vs, black_white_fs,
-                     fish_eye_vs, fish_eye_fs, shockwave_vs, shockwave_fs,
+                     fish_eye_vs, fish_eye_fs, ripple_vs, ripple_fs,
                      toon_vs, toon_fs, edge_vs, edge_fs])
         .then((shaders) => this.LoadAllShaders(shaders))
         .catch((error) => this.GetFileError(error));
@@ -159,9 +159,8 @@ class GlApp {
         this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
         this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
 
-        let pixels = [255, 255, 255, 255,    0,   0,   0, 255,  255, 255, 255, 255,
-                        0,   0,   0, 255,  255, 255, 255, 255,    0,   0,   0, 255];
-        this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, 3, 2, 0, this.gl.RGBA, this.gl.UNSIGNED_BYTE, new Uint8Array(pixels));
+        let pixels = [0, 135, 0, 255];
+        this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, 1, 1, 0, this.gl.RGBA, this.gl.UNSIGNED_BYTE, new Uint8Array(pixels));
 
         this.gl.bindTexture(this.gl.TEXTURE_2D, null);
     }
@@ -202,6 +201,14 @@ class GlApp {
         this.gl.uniformMatrix4fv(shader.uniform.view_matrix, false, this.view_matrix);
         this.gl.uniformMatrix4fv(shader.uniform.model_matrix, false, this.model_matrix);
 
+        if (this.filter === 'edge') {
+            this.gl.uniform1f(shader.uniform.width, this.video.videoWidth);
+            this.gl.uniform1f(shader.uniform.height, this.video.videoHeight);
+        }
+        else if (this.filter === 'ripple') {
+            this.gl.uniform1f(shader.uniform.time, time / 1000.0);
+        }
+
         this.gl.activeTexture(this.gl.TEXTURE0);
         this.gl.bindTexture(this.gl.TEXTURE_2D, this.video_texture);
         this.gl.uniform1i(shader.uniform.image, 0);
@@ -236,7 +243,7 @@ class GlApp {
         this.LoadShader(shaders[ 0], shaders[ 1], 'normal');
         this.LoadShader(shaders[ 2], shaders[ 3], 'black_white');
         this.LoadShader(shaders[ 4], shaders[ 5], 'fish_eye');
-        this.LoadShader(shaders[ 6], shaders[ 7], 'shockwave');
+        this.LoadShader(shaders[ 6], shaders[ 7], 'ripple');
         this.LoadShader(shaders[ 8], shaders[ 9], 'toon');
         this.LoadShader(shaders[10], shaders[11], 'edge');
 
@@ -254,7 +261,6 @@ class GlApp {
 
         // specify input and output attributes for the GPU program
         this.gl.bindAttribLocation(program, this.vertex_position_attrib, "vertex_position");
-        this.gl.bindAttribLocation(program, this.vertex_normal_attrib, "vertex_normal");
         this.gl.bindAttribLocation(program, this.vertex_texcoord_attrib, 'vertex_texcoord');
         this.gl.bindAttribLocation(program, 0, "FragColor");
 
