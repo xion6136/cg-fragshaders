@@ -1,3 +1,5 @@
+const {mat4, vec2, vec3} = glMatrix;
+
 class GlApp {
     constructor(canvas_id, width, height, video) {
         // initialize <canvas> with a WebGL 2 context
@@ -16,17 +18,17 @@ class GlApp {
             fish_eye: null,
             ripple: null,
             toon: null,
-            edge: null
+            custom: null
         };
 
         this.vertex_position_attrib = 0;                  // vertex attribute 0: 3D position
         this.vertex_texcoord_attrib = 1;                  // vertex attribute 1: 2D texture coordinates
 
-        this.projection_matrix = glMatrix.mat4.create();  // projection matrix (on CPU)
-        this.view_matrix = glMatrix.mat4.create();        // view matrix (on CPU)
-        this.model_matrix = glMatrix.mat4.create();       // model matrix (on CPU)
+        this.projection_matrix = mat4.create();           // projection matrix (on CPU)
+        this.view_matrix = mat4.create();                 // view matrix (on CPU)
+        this.model_matrix = mat4.create();                // model matrix (on CPU)
 
-        this.plane_vao = null;                            // plane Vertex Array Object (contains all attributes
+        this.plane = null;                                // plane Vertex Array Object (contains all attributes
                                                           // of the model - vertices, texcoords, faces, ...)
 
         this.video = video;                               // video element
@@ -39,27 +41,55 @@ class GlApp {
 
 
         // download and compile shaders into GPU program
-        let normal_vs = this.GetFile('shaders/normal.vert');
-        let normal_fs = this.GetFile('shaders/normal.frag');
-        let black_white_vs = this.GetFile('shaders/black_white.vert');
-        let black_white_fs = this.GetFile('shaders/black_white.frag');
-        let fish_eye_vs = this.GetFile('shaders/fish_eye.vert');
-        let fish_eye_fs = this.GetFile('shaders/fish_eye.frag');
-        let ripple_vs = this.GetFile('shaders/ripple.vert');
-        let ripple_fs = this.GetFile('shaders/ripple.frag');
-        let toon_vs = this.GetFile('shaders/toon.vert');
-        let toon_fs = this.GetFile('shaders/toon.frag');
-        let edge_vs = this.GetFile('shaders/edge.vert');
-        let edge_fs = this.GetFile('shaders/edge.frag');
+        let normal_vs = this.getFile('shaders/normal.vert');
+        let normal_fs = this.getFile('shaders/normal.frag');
+        let black_white_vs = this.getFile('shaders/black_white.vert');
+        let black_white_fs = this.getFile('shaders/solution/black_white.frag');
+        let fish_eye_vs = this.getFile('shaders/fish_eye.vert');
+        let fish_eye_fs = this.getFile('shaders/solution/fish_eye.frag');
+        let ripple_vs = this.getFile('shaders/ripple.vert');
+        let ripple_fs = this.getFile('shaders/solution/ripple.frag');
+        let toon_vs = this.getFile('shaders/toon.vert');
+        let toon_fs = this.getFile('shaders/solution/toon.frag');
+        let custom_vs = this.getFile('shaders/custom.vert');
+        let custom_fs = this.getFile('shaders/solution/custom.frag');
 
         Promise.all([normal_vs, normal_fs, black_white_vs, black_white_fs,
                      fish_eye_vs, fish_eye_fs, ripple_vs, ripple_fs,
-                     toon_vs, toon_fs, edge_vs, edge_fs])
-        .then((shaders) => this.LoadAllShaders(shaders))
-        .catch((error) => this.GetFileError(error));
+                     toon_vs, toon_fs, custom_vs, custom_fs])
+        .then((shaders) => this.loadAllShaders(shaders))
+        .catch((error) => this.getFileError(error));
     }
 
-    InitializeGlApp() {
+    loadAllShaders(shaders) {
+        this.shader.normal = this.createShaderProgram(shaders[0], shaders[1]);
+        this.shader.black_white = this.createShaderProgram(shaders[2], shaders[3]);
+        this.shader.fish_eye = this.createShaderProgram(shaders[4], shaders[5]);
+        this.shader.ripple = this.createShaderProgram(shaders[6], shaders[7]);
+        this.shader.toon = this.createShaderProgram(shaders[8], shaders[9]);
+        this.shader.custom = this.createShaderProgram(shaders[10], shaders[11]);
+
+        this.initializeGlApp();
+    }
+
+    createShaderProgram(vert_source, frag_source) {
+        // Compile shader program
+        let program = glslCreateShaderProgram(this.gl, vert_source, frag_source);
+
+        // Bind vertex input data locations
+        this.gl.bindAttribLocation(program, this.vertex_position_attrib, 'vertex_position');
+        this.gl.bindAttribLocation(program, this.vertex_texcoord_attrib, 'vertex_texcoord');
+
+        // Link shader program
+        glslLinkShaderProgram(this.gl, program);
+
+        // Get list of uniforms available in shaders
+        let uniforms = glslGetShaderProgramUniforms(this.gl, program);
+        
+        return {program: program, uniforms: uniforms};
+    }
+
+    initializeGlApp() {
         // set drawing area to be the entire framebuffer
         this.gl.viewport(0, 0, this.gl.drawingBufferWidth, this.gl.drawingBufferHeight);
         // set the background color to black
@@ -68,16 +98,16 @@ class GlApp {
         this.gl.enable(this.gl.DEPTH_TEST);
 
         // create plane model
-        this.plane_vao = this.CreatePlaneVao();
+        this.plane = this.createPlaneVao();
 
         // initialize texture
-        this.InitializeTexture();
+        this.initializeTexture();
 
         // render scene
-        window.requestAnimationFrame((timestamp) => { this.Animate(timestamp) });
+        window.requestAnimationFrame((timestamp) => { this.animate(timestamp) });
     }
 
-    CreatePlaneVao() {
+    createPlaneVao() {
         // create a new Vertex Array Object
         let vertex_array = this.gl.createVertexArray();
         // set newly created Vertex Array Object as the active one we are modifying
@@ -138,6 +168,8 @@ class GlApp {
 
         // no longer modifying our Vertex Array Object, so deselect
         this.gl.bindVertexArray(null);
+        this.gl.bindBuffer(this.gl.ARRAY_BUFFER, null);
+        this.gl.bindBuffer(this.gl.ELEMENT_ARRAY_BUFFER, null);
 
 
         // store the number of vertices used for entire model (number of faces * 3)
@@ -148,8 +180,8 @@ class GlApp {
         return vertex_array;
     }
 
-    InitializeTexture() {
-        // create a texture, and upload a temporary 1px white RGBA array [255,255,255,255]
+    initializeTexture() {
+        // create a texture, and upload a temporary 1px green RGBA array [0, 135, 0, 255]
         this.video_texture = this.gl.createTexture();
 
         this.gl.bindTexture(this.gl.TEXTURE_2D, this.video_texture);
@@ -165,7 +197,7 @@ class GlApp {
         this.gl.bindTexture(this.gl.TEXTURE_2D, null);
     }
 
-    UpdateTexture() {
+    updateTexture() {
         // update texture from video
         this.gl.bindTexture(this.gl.TEXTURE_2D, this.video_texture);
 
@@ -174,22 +206,22 @@ class GlApp {
         this.gl.bindTexture(this.gl.TEXTURE_2D, null);
     }
 
-    SetFilter(filter) {
+    setFilter(filter) {
         this.filter = filter;
     }
 
-    Animate(timestamp) {
+    animate(timestamp) {
         let time = timestamp - this.start_time;
 
         if (this.has_video) {
-            this.UpdateTexture();
+            this.updateTexture();
         }
-        this.Render(time);
+        this.render(time);
 
-        window.requestAnimationFrame((timestamp) => { this.Animate(timestamp) });
+        window.requestAnimationFrame((timestamp) => { this.animate(timestamp) });
     }
 
-    Render(time) {
+    render(time) {
         // delete previous frame (reset both framebuffer and z-buffer)
         this.gl.clear(this.gl.COLOR_BUFFER_BIT | this.gl.DEPTH_BUFFER_BIT);
         
@@ -197,29 +229,31 @@ class GlApp {
         let shader = this.shader[this.filter];
         this.gl.useProgram(shader.program);
 
-        this.gl.uniformMatrix4fv(shader.uniform.projection_matrix, false, this.projection_matrix);
-        this.gl.uniformMatrix4fv(shader.uniform.view_matrix, false, this.view_matrix);
-        this.gl.uniformMatrix4fv(shader.uniform.model_matrix, false, this.model_matrix);
+        this.gl.uniformMatrix4fv(shader.uniforms.projection_matrix, false, this.projection_matrix);
+        this.gl.uniformMatrix4fv(shader.uniforms.view_matrix, false, this.view_matrix);
+        this.gl.uniformMatrix4fv(shader.uniforms.model_matrix, false, this.model_matrix);
 
-        if (this.filter === 'edge') {
-            this.gl.uniform1f(shader.uniform.width, this.video.videoWidth);
-            this.gl.uniform1f(shader.uniform.height, this.video.videoHeight);
+        if (this.filter === 'custom') {
+            this.gl.uniform1f(shader.uniforms.width, this.video.videoWidth);
+            this.gl.uniform1f(shader.uniforms.height, this.video.videoHeight);
         }
         else if (this.filter === 'ripple') {
-            this.gl.uniform1f(shader.uniform.time, time / 1000.0);
+            this.gl.uniform1f(shader.uniforms.time, time / 1000.0);
         }
 
         this.gl.activeTexture(this.gl.TEXTURE0);
         this.gl.bindTexture(this.gl.TEXTURE_2D, this.video_texture);
-        this.gl.uniform1i(shader.uniform.image, 0);
+        this.gl.uniform1i(shader.uniforms.image, 0);
 
 
-        this.gl.bindVertexArray(this.plane_vao);
-        this.gl.drawElements(this.gl.TRIANGLES, this.plane_vao.face_index_count, this.gl.UNSIGNED_SHORT, 0);
+        this.gl.bindVertexArray(this.plane);
+        this.gl.drawElements(this.gl.TRIANGLES, this.plane.face_index_count, this.gl.UNSIGNED_SHORT, 0);
         this.gl.bindVertexArray(null);
+
+        this.gl.bindTexture(this.gl.TEXTURE_2D, null);
     }
 
-    GetFile(url) {
+    getFile(url) {
         return new Promise((resolve, reject) => {
             let req = new XMLHttpRequest();
             req.onreadystatechange = function() {
@@ -235,90 +269,7 @@ class GlApp {
         });
     }
 
-    GetFileError(error) {
+    getFileError(error) {
         console.log('Error:', error);
-    }
-
-    LoadAllShaders(shaders) {
-        this.LoadShader(shaders[ 0], shaders[ 1], 'normal');
-        this.LoadShader(shaders[ 2], shaders[ 3], 'black_white');
-        this.LoadShader(shaders[ 4], shaders[ 5], 'fish_eye');
-        this.LoadShader(shaders[ 6], shaders[ 7], 'ripple');
-        this.LoadShader(shaders[ 8], shaders[ 9], 'toon');
-        this.LoadShader(shaders[10], shaders[11], 'edge');
-
-        this.InitializeGlApp();
-    }
-
-    LoadShader(vert_source, frag_source, program_name, has_texture) {
-        // compile vetex shader
-        let vertex_shader = this.CompileShader(vert_source, this.gl.VERTEX_SHADER);
-        // compile fragment shader
-        let fragment_shader = this.CompileShader(frag_source, this.gl.FRAGMENT_SHADER);
-
-        // create GPU program from the compiled vertex and fragment shaders
-        let program = this.CreateShaderProgram(vertex_shader, fragment_shader);
-
-        // specify input and output attributes for the GPU program
-        this.gl.bindAttribLocation(program, this.vertex_position_attrib, "vertex_position");
-        this.gl.bindAttribLocation(program, this.vertex_texcoord_attrib, 'vertex_texcoord');
-        this.gl.bindAttribLocation(program, 0, "FragColor");
-
-        // link compiled GPU program
-        this.LinkShaderProgram(program);
-
-        // get handles to uniform variables defined in the shaders
-        let num_uniforms = this.gl.getProgramParameter(program, this.gl.ACTIVE_UNIFORMS);
-        let uniform = {};
-        let i;
-        for (i = 0; i < num_uniforms; i++) {
-            let info = this.gl.getActiveUniform(program, i);
-            uniform[info.name] = this.gl.getUniformLocation(program, info.name);
-        }
-
-        this.shader[program_name] = {
-            program: program,
-            uniform: uniform
-        }
-    }
-
-    CompileShader(source, type) {
-        // create a shader object
-        let shader = this.gl.createShader(type);
-
-        // send the source to the shader object
-        this.gl.shaderSource(shader, source);
-
-        // compile the shader program
-        this.gl.compileShader(shader);
-
-        // check to see if it compiled successfully
-        if (!this.gl.getShaderParameter(shader, this.gl.COMPILE_STATUS)) {
-            alert("An error occurred compiling the shader: " + this.gl.getShaderInfoLog(shader));
-        }
-
-        return shader;
-    }
-
-    CreateShaderProgram(vertex_shader, fragment_shader) {
-        // create a GPU program
-        let program = this.gl.createProgram();
-        
-        // attach the vertex and fragment shaders to that program
-        this.gl.attachShader(program, vertex_shader);
-        this.gl.attachShader(program, fragment_shader);
-
-        // return the program
-        return program;
-    }
-
-    LinkShaderProgram(program) {
-        // link GPU program
-        this.gl.linkProgram(program);
-
-        // check to see if it linked successfully
-        if (!this.gl.getProgramParameter(program, this.gl.LINK_STATUS)) {
-            alert("An error occurred linking the shader program.");
-        }
     }
 }

@@ -5,31 +5,46 @@
     <meta name="viewport" content="width=device-width, initial-scale=1"/>
     <title>WebGL Fragment Shader Fun</title>
     <link rel="stylesheet" href="css/style.css">
-    <script src="https://cdn.jsdelivr.net/npm/vue"></script>
     <script type="application/javascript" src="scripts/gl-matrix-min.js"></script>
+    <script type="application/javascript" src="scripts/glsl.js"></script>
     <script type="application/javascript" src="scripts/filters.js"></script>
     <script type="application/javascript">
         let glapp;
+        let video;
         let cam_stream;
         function init() {
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                alert("Error: getUserMedia() not supported. Please try another browser.");
+                alert('Error: getUserMedia() not supported. Please try another browser for WebCam.');
             }
 
             let i;
-            let filters = document.getElementsByClassName("filter_button");
+            let filters = document.getElementsByClassName('filter_button');
             for (i = 0; i < filters.length; i++) {
-                filters[i].addEventListener("click", selectFilter, false);
+                filters[i].addEventListener('click', selectFilter, false);
             }
 
             cam_stream = null;
-            startVideoStream();
 
-            let webcam = document.getElementById("webcam");
-            glapp = new GlApp("view", 800, 450, webcam);
+            video = document.createElement('video');
+            video.autoplay = true;
+            video.muted = true;
+            video.loop = true;
+
+            glapp = new GlApp('view', 800, 450, video);
+            
+            video.onloadedmetadata = (e) => {
+                video.play();
+                glapp.has_video = true;
+                let start_stop = document.getElementById('start_stop');
+                let start_stop_button = document.getElementById('start_stop_button');
+                start_stop.textContent = 'Stop';
+                start_stop_button.style.backgroundColor = '#D85A58';
+            };
+            video.src = 'videos/dm_vector.mp4';
         }
 
         function startVideoStream() {
+            glapp.has_video = false;
             let options = {
                 audio: false,
                 video: {
@@ -46,47 +61,67 @@
 
         function receiveVideoStream(stream) {
             cam_stream = stream;
-            let webcam = document.getElementById("webcam");
-            webcam.srcObject = stream;
-            webcam.onloadedmetadata = (e) => {
-                webcam.play();
-                glapp.has_video = true;
-                let start_stop = document.getElementById("start_stop");
-                let start_stop_button = document.getElementById("start_stop_button");
-                start_stop.textContent = "Stop";
-                start_stop_button.style.backgroundColor = "#D85A58";
-            };
+            video.srcObject = stream;
         }
 
         function selectFilter(event) {
             let i;
-            let filters = document.getElementsByClassName("filter_button");
+            let filters = document.getElementsByClassName('filter_button');
             for (i = 0; i < filters.length; i++) {
-                if (filters[i].id === event.target.id + "_button") {
-                    filters[i].setAttribute("selected", "true");
-                    glapp.SetFilter(event.target.id);
+                if (filters[i].id === event.target.id + '_button') {
+                    filters[i].setAttribute('selected', 'true');
+                    glapp.setFilter(event.target.id);
                 }
                 else {
-                    filters[i].setAttribute("selected", "false");
+                    filters[i].setAttribute('selected', 'false');
                 }
             }
         }
 
-        function startStop() {
-            let start_stop = document.getElementById("start_stop");
-            let start_stop_button = document.getElementById("start_stop_button");
-            if (start_stop.textContent === "Start") {
+        function toggleImageInput() {
+            if (document.getElementById('image_input').checked === true) { // webcam
                 startVideoStream();
-                start_stop.textContent = "...";
-                start_stop_button.style.backgroundColor = "#C6C6C6";
             }
-            else if (start_stop.textContent === "Stop") {
-                cam_stream.getTracks().forEach(function(track) {
-                    track.stop();
-                });
+            else {
                 glapp.has_video = false;
-                start_stop.textContent = "Start";
-                start_stop_button.style.backgroundColor = "#48C45B";
+                video.srcObject = null;
+                video.src = 'videos/dm_vector.mp4';
+            }
+
+            let start_stop = document.getElementById('start_stop');
+            let start_stop_button = document.getElementById('start_stop_button');
+            start_stop.textContent = '...';
+            start_stop_button.style.backgroundColor = '#C6C6C6';
+        }
+
+        function startStop() {
+            let start_stop = document.getElementById('start_stop');
+            let start_stop_button = document.getElementById('start_stop_button');
+            if (start_stop.textContent === 'Start') {
+                if (document.getElementById('image_input').checked === true) { // webcam
+                    startVideoStream();
+                    start_stop.textContent = '...';
+                    start_stop_button.style.backgroundColor = '#C6C6C6';
+                }
+                else { // video
+                    video.play();
+                    glapp.has_video = true;
+                    start_stop.textContent = 'Stop';
+                    start_stop_button.style.backgroundColor = '#D85A58';
+                }
+            }
+            else if (start_stop.textContent === 'Stop') {
+                if (document.getElementById('image_input').checked === true) { // webcam
+                    cam_stream.getTracks().forEach(function(track) {
+                        track.stop();
+                    });
+                }
+                else {
+                    video.pause();
+                }
+                glapp.has_video = false;
+                start_stop.textContent = 'Start';
+                start_stop_button.style.backgroundColor = '#48C45B';
             }
         }
     </script>
@@ -114,18 +149,31 @@
                 <div id="toon_button" class="filter_button">
                     <p id="toon">Toonify</p>
                 </div>
-                <div id="edge_button" class="filter_button">
-                    <p id="edge">Edge Detection</p>
+                <div id="custom_button" class="filter_button">
+                    <p id="custom">Custom</p>
                 </div>
             </div>
             <div class="spacer"></div>
             <div>
+                <div id="image_toggle">
+                    <div style="display: inline-block;">
+                        <label class="toggle_label">Video</label>
+                    </div>
+                    <div style="display: inline-block;">
+                        <label class="switch" style="margin-top: 0.25rem;">
+                            <input id="image_input" type="checkbox" onchange="toggleImageInput()">
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+                    <div style="display: inline-block;">
+                        <label class="toggle_label">WebCam</label>
+                    </div>
+                </div>
                 <div id="start_stop_button">
                     <p id="start_stop" onclick="startStop()">...</p>
                 </div>
             </div>
         </div>
     </div>
-    <video id="webcam"></video>
 </body>
 </html>
