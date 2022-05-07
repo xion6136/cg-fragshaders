@@ -44,15 +44,15 @@ class GlApp {
         let normal_vs = this.getFile('shaders/normal.vert');
         let normal_fs = this.getFile('shaders/normal.frag');
         let black_white_vs = this.getFile('shaders/black_white.vert');
-        let black_white_fs = this.getFile('shaders/solution/black_white.frag');
+        let black_white_fs = this.getFile('shaders/black_white.frag');
         let fish_eye_vs = this.getFile('shaders/fish_eye.vert');
-        let fish_eye_fs = this.getFile('shaders/solution/fish_eye.frag');
+        let fish_eye_fs = this.getFile('shaders/fish_eye.frag');
         let ripple_vs = this.getFile('shaders/ripple.vert');
-        let ripple_fs = this.getFile('shaders/solution/ripple.frag');
+        let ripple_fs = this.getFile('shaders/ripple.frag');
         let toon_vs = this.getFile('shaders/toon.vert');
-        let toon_fs = this.getFile('shaders/solution/toon.frag');
+        let toon_fs = this.getFile('shaders/toon.frag');
         let custom_vs = this.getFile('shaders/custom.vert');
-        let custom_fs = this.getFile('shaders/solution/custom.frag');
+        let custom_fs = this.getFile('shaders/custom.frag');
 
         Promise.all([normal_vs, normal_fs, black_white_vs, black_white_fs,
                      fish_eye_vs, fish_eye_fs, ripple_vs, ripple_fs,
